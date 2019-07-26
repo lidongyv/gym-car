@@ -1,7 +1,14 @@
+# -*- coding: utf-8 -*-
+# @Author: yulidong
+# @Date:   2019-07-26 11:15:33
+# @Last Modified by:   yulidong
+# @Last Modified time: 2019-07-26 11:15:51
+
 """
 Define MDRNN model, supposed to be used as a world model
 on the latent space.
 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
