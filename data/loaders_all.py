@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Author: yulidong
-# @Date:   2019-07-28 23:10:02
-# @Last Modified by:   yulidong
-# @Last Modified time: 2019-07-29 00:12:51
+""" Some data loading utilities """
 from bisect import bisect
 from os import listdir
 from os.path import join, isdir
@@ -12,20 +8,21 @@ import torch.utils.data
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+N=3000
 O=2
-class _RolloutDataset(torch.utils.data.Dataset): 
-    def __init__(self, root, transform, train=True,sample_data=1000,sample_count=0): 
+class _RolloutDataset(torch.utils.data.Dataset): # pylint: disable=too-few-public-methods
+    def __init__(self, root, transform, train=True): # pylint: disable=too-many-arguments
         self._transform = transform
         self._root=root
         self._files = listdir(root)
         self._files.sort()
         if train:
-            self._files = self._files[sample_data*sample_count:sample_data*(sample_count+1)]
-            self._length,self._data = self._create_dataset(self._files, sample_data)
+            self._files = self._files[:N]
+            self._length,self._data = self._create_dataset(self._files, N)
 
         else:
             self._files = self._files[-O:]
-            self._length,self._data = self._create_dataset(self._files, sample_data)
+            self._length,self._data = self._create_dataset(self._files, O)
 
         #self.length=self.__len__()
 
@@ -46,8 +43,6 @@ class _RolloutDataset(torch.utils.data.Dataset):
         index_i=[]
         index_j=[]
         info=[]
-        # print(len(filelist))
-        # exit()
         for i in range(N):
             speed_t=[0]
             pos_t=[[0,0]]
@@ -78,7 +73,7 @@ class _RolloutDataset(torch.utils.data.Dataset):
 
         return length,data
     def __getitem__(self, index):
-        if(self._data['index'][1][index]+1>=len(self._data['obs'][self._data['index'][0][index]])):
+        while(self._data['index'][1][index]+1>=len(self._data['obs'][self._data['index'][0][index]])):
             index=index-1
             print('reach the end')
 
@@ -93,7 +88,7 @@ class _RolloutDataset(torch.utils.data.Dataset):
         # print(obs.shape,obs.dtype)
         obs=self._get_data(obs.astype(np.uint8)).float()
         pre=self._get_data(pre.astype(np.uint8)).float()
-        #print(speed)
+
         action=torch.cat([torch.from_numpy(action).float().view(3,1,1),torch.from_numpy(speed).float().view(1,1,1)],dim=0).view(4,1,1)
         action=action.expand(4,obs.shape[1],obs.shape[2])
         #print(obs.shape,action.shape,pre.shape)

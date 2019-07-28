@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-26 11:12:08
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-07-27 04:42:30
+# @Last Modified time: 2019-07-28 18:26:46
 
 """
 Variational encoder model, used as a visual model
@@ -40,7 +40,7 @@ class Decoder(nn.Module):
         #64
         self.up6_1 = conv2D(16, 8, 3,padding=1)
         self.up6_2 = conv2D(8, 3, 3,padding=1)
-        self.relu=nn.ReLU(inplace=False)
+        self.relu=nn.LeakyReLU(inplace=False)
         self.upsample=nn.Sequential(self.up1,self.up1_1,self.up2,self.up2_1,self.up3,self.up3_1,self.up4,self.up4_1,self.up5,self.up5_1,self.up6,self.up6_1,self.up6_2,self.relu)
         #58+6=64 14+2
     def forward(self, x): 
@@ -88,7 +88,7 @@ class Encoder(nn.Module):
         self.feature = nn.Sequential(self.conv0,self.conv1,self.conv1_1,self.conv2,self.conv2_1,self.conv3,self.conv3_1,self.conv4,self.conv4_1,self.conv5,self.conv6)
         self.fc_mu = nn.Sequential(Linear(1024, 256),Linear(256,latent_size))
 
-        self.fc_logsigma = nn.Sequential(Linear(1024, 256),Linear(256,latent_size))
+        self.fc_sigma = nn.Sequential(Linear(1024, 256),Linear(256,latent_size))
 
 
     def forward(self, x): # pylint: disable=arguments-differ
@@ -104,9 +104,9 @@ class Encoder(nn.Module):
         x = x.view(x.size(0), -1)
 
         mu = self.fc_mu(x)
-        logsigma = self.fc_logsigma(x)
+        sigma = self.fc_sigma(x)
 
-        return mu, logsigma
+        return mu, sigma
 
 class VAE(nn.Module):
     """ Variational Autoencoder """
@@ -116,11 +116,10 @@ class VAE(nn.Module):
         self.decoder = Decoder(img_channels, latent_size)
 
     def forward(self, x): # pylint: disable=arguments-differ
-        mu, logsigma = self.encoder(x)
-        sigma = torch.exp(logsigma/2.0)
+        mu, sigma = self.encoder(x)
         epsilon = torch.randn_like(sigma)
         #z = eps.mul(sigma).add_(mu)
         z=mu+sigma*epsilon
 
         recon_x = self.decoder(z)
-        return recon_x, mu, logsigma
+        return recon_x, mu, sigma

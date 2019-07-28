@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Author: yulidong
-# @Date:   2019-07-28 23:10:02
-# @Last Modified by:   yulidong
-# @Last Modified time: 2019-07-29 00:12:51
+""" Some data loading utilities """
 from bisect import bisect
 from os import listdir
 from os.path import join, isdir
@@ -12,23 +8,23 @@ import torch.utils.data
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+N=600
 O=2
-class _RolloutDataset(torch.utils.data.Dataset): 
-    def __init__(self, root, transform, train=True,sample_data=1000,sample_count=0): 
+class _RolloutDataset(torch.utils.data.Dataset): # pylint: disable=too-few-public-methods
+    def __init__(self, root, transform, train=True): # pylint: disable=too-many-arguments
         self._transform = transform
         self._root=root
         self._files = listdir(root)
         self._files.sort()
         if train:
-            self._files = self._files[sample_data*sample_count:sample_data*(sample_count+1)]
-            self._length,self._data = self._create_dataset(self._files, sample_data)
+            self._files = self._files[:N]
+            self._length,self._data = self._create_dataset(self._files, N)
 
         else:
             self._files = self._files[-O:]
-            self._length,self._data = self._create_dataset(self._files, sample_data)
+            self._length,self._data = self._create_dataset(self._files, O)
 
         #self.length=self.__len__()
-
 
     def __len__(self):
         # to have a full sequence, you need self.seq_len + 1 elements, as
@@ -46,8 +42,6 @@ class _RolloutDataset(torch.utils.data.Dataset):
         index_i=[]
         index_j=[]
         info=[]
-        # print(len(filelist))
-        # exit()
         for i in range(N):
             speed_t=[0]
             pos_t=[[0,0]]
@@ -56,8 +50,8 @@ class _RolloutDataset(torch.utils.data.Dataset):
             raw_data = np.load(os.path.join(self._root, filename))
             #obs=recording_obs,mu=recording_mu, logvar=recording_logvar, action=recording_action, reward=recording_reward,info=recording_info
             #{'pos':[x,y],'speed':true_speed}
-            obs.append(raw_data['obs'])
-            action.append(raw_data['action'])
+            # obs.append(raw_data['obs'])
+            # action.append(raw_data['action'])
             #print(len(raw_data['action']),len(raw_data['obs']))
             #print(raw_data['info'][:])
             # for j in range(len(raw_data['action'])-1):
@@ -65,7 +59,7 @@ class _RolloutDataset(torch.utils.data.Dataset):
             #     pos_t.append(raw_data['info'][j]['pos'])
             # speed.append(speed_t)
             # pos.append(pos_t)
-            info.append(raw_data['info'])
+            # info.append(raw_data['info'])
             length+=len(raw_data['action'])
             index_i.append(i*np.ones(len(raw_data['action'])))
             index_j.append(np.arange(0,len(raw_data['action'])))
@@ -74,26 +68,30 @@ class _RolloutDataset(torch.utils.data.Dataset):
         index_i=np.concatenate(index_i).astype(np.int32)
         index_j=np.concatenate(index_j).astype(np.int32)
         #print(index_i)
-        data={'obs':obs,'action':action,'info':info,'index':[index_i,index_j]}
-
+        #data={'obs':obs,'action':action,'info':info,'index':[index_i,index_j]}
+        data={'index':[index_i,index_j]}
         return length,data
     def __getitem__(self, index):
-        if(self._data['index'][1][index]+1>=len(self._data['obs'][self._data['index'][0][index]])):
+        index=np.max([0,index-1])
+        #print(index)
+        data=np.load(os.path.join(self._root, self._files[self._data['index'][0][index]]))
+        while(self._data['index'][1][index+1]<self._data['index'][1][index]+1):
             index=index-1
             print('reach the end')
 
-        obs=self._data['obs'][self._data['index'][0][index]][self._data['index'][1][index]]
-        pre=self._data['obs'][self._data['index'][0][index+1]][self._data['index'][1][index+1]]
-        action=np.array(self._data['action'][self._data['index'][0][index]][self._data['index'][1][index]])
-        speed=np.array(self._data['info'][self._data['index'][0][index]][self._data['index'][1][index]]['speed'])
-        pos=np.array(self._data['info'][self._data['index'][0][index]][self._data['index'][1][index]]['pos'])
+        obs=data['obs'][self._data['index'][1][index]]
+        pre=data['obs'][self._data['index'][1][index+1]]
+        action=np.array(data['action'][self._data['index'][1][index]])
+        #print(data['info'][self._data['index'][1][index]])
+        speed=np.array(data['info'][self._data['index'][1][index]]['speed'])
+        pos=np.array(data['info'][self._data['index'][1][index]]['pos'])
         #speed=np.array(self._data['speed'][self._data['index'][0][index]][self._data['index'][1][index]])
         #pos=self._data['pos'][self._data['index'][0][index]][self._data['index'][1][index]]
         #speed=1
         # print(obs.shape,obs.dtype)
         obs=self._get_data(obs.astype(np.uint8)).float()
         pre=self._get_data(pre.astype(np.uint8)).float()
-        #print(speed)
+
         action=torch.cat([torch.from_numpy(action).float().view(3,1,1),torch.from_numpy(speed).float().view(1,1,1)],dim=0).view(4,1,1)
         action=action.expand(4,obs.shape[1],obs.shape[2])
         #print(obs.shape,action.shape,pre.shape)
