@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-24 22:07:12
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-07-29 00:04:57
+# @Last Modified time: 2019-07-29 14:35:11
 
 """ Define controller """
 import torch
@@ -20,5 +20,5 @@ class Controller(nn.Module):
         action[:,0]=torch.tanh(action[:,0])
         action[:,1]=torch.sigmoid(action[:,1])
         action[:,2]=torch.sigmoid(action[:,2])
-        action[:,3]=action[:,3]
+        # action[:,3]=action[:,3]
         return action

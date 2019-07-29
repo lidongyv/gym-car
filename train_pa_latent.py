@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-27 01:06:36
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-07-29 14:51:45
+# @Last Modified time: 2019-07-29 14:38:39
 
 """ Training perception and control """
 import argparse
@@ -74,10 +74,10 @@ model_p=VAE_a(7, LSIZE)
 model_p=torch.nn.DataParallel(model_p,device_ids=range(8))
 model_p.cuda()
 optimizer_p = optim.Adam(model_p.parameters(),lr=learning_rate,betas=(0.9,0.999))
-controller=Controller(LSIZE,3)
+controller=Controller(LSIZE,4)
 controller=torch.nn.DataParallel(controller,device_ids=range(8))
 controller=controller.cuda()
-optimizer_a = optim.SGD(controller.parameters(),lr=learning_rate*10)
+optimizer_a = optim.Adam(controller.parameters(),lr=learning_rate,betas=(0.9,0.999))
 # scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
 # earlystopping = EarlyStopping('min', patience=30)
 
@@ -138,18 +138,13 @@ def loss_function(recon_x, x, mu, sigma):
 	#mask_distance[:,:,-16:,:]=mask_distance[:,:,-16:,:]*10
 	#mask_distance[:,:,-32:-16,:]=mask_distance[:,:,-32:-16,:]*5
 	#mask_distance[:,:,-48:-32,:]=mask_distance[:,:,-48:-32,:]*2
-	# BCE = F.mse_loss(recon_x*mask_distance,x*mask_distance,reduction='sum')/torch.sum(mask)+ \
-	# 	0.1*F.mse_loss(recon_x*(1-mask),x*(1-mask),reduction='sum')/torch.sum(1-mask)
-	BCE = F.mse_loss(recon_x*mask_distance,x*mask_distance,reduction='sum')+ \
-		0.1*F.mse_loss(recon_x*(1-mask),x*(1-mask),reduction='sum')
-	BCE=BCE/x.shape[0]
+	BCE = F.mse_loss(recon_x*mask_distance,x*mask_distance,reduction='sum')/torch.sum(mask)+ \
+		0.1*F.mse_loss(recon_x*(1-mask),x*(1-mask),reduction='sum')/torch.sum(1-mask)
 	#print(torch.mean(recon_x).item())
 	# see Appendix B from VAE paper:
 	# Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
 	# https://arxiv.org/abs/1312.6114
 	# -0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-	sigma=torch.max(sigma,1e-4*torch.ones_like(sigma).cuda())
-	#print(torch.mean(torch.pow(sigma,2)).item(),torch.mean(torch.pow(mu,2)).item())
 	KLD = -0.5 * torch.sum(1 + torch.log(torch.pow(sigma,2)) - torch.pow(mu,2) - torch.pow(sigma,2),dim=1)
 	#KLD=torch.max(KLD,torch.ones_like(KLD).cuda()*LSIZE*0.5)
 	KLD=torch.mean(KLD)
@@ -159,7 +154,7 @@ def loss_function(recon_x, x, mu, sigma):
 	return BCE + KLD
 
 
-def train(epoch,vae_dir,training_sample):
+def train(epoch,vae_dir):
 	""" One training epoch """
 	model.train()
 	model_p.train()
@@ -186,17 +181,13 @@ def train(epoch,vae_dir,training_sample):
 		z=z.cuda().view(data.shape[0],-1).detach()
 		action_p=controller(z)
 		#print(action[:,:,0,0])
-		loss_a=F.mse_loss(action_p,action[:,:3,11,11],reduction='mean')
+		loss_a=F.mse_loss(action_p,action[:,:,11,11],reduction='mean')
 		#action_pr=torch.cat([action_p.detach().view(action_p.shape[0],3,1,1).expand(action_p.shape[0],3,action.shape[-2],action.shape[-1]),action[:,2:3,...]])
-		action_pr=action_p.detach().view(action_p.shape[0],3,1,1).expand(action_p.shape[0],3,action.shape[-1],action.shape[-2])
-		action_pr=torch.cat([action_pr,action[:,2:3,:,:]],dim=1)
+		action_pr=action_p.detach().view(action_p.shape[0],4,1,1).expand(action_p.shape[0],4,action.shape[-1],action.shape[-2])
 		recon_pr, mu_pr, var_pr = model_p(torch.cat([data,action_pr],dim=1))
 		loss_pr = loss_function(recon_pr, pre, mu_pr, var_pr)
 
 		loss=loss_c+loss_f+loss_p+loss_a+loss_pr
-		if torch.isnan(loss) or torch.isinf(loss):
-			print('nan or inf error:',loss.item() )
-			continue
 		loss.backward()
 
 		#print(loss.item())
@@ -248,32 +239,31 @@ def train(epoch,vae_dir,training_sample):
 		# if loss_c>5:
 		# 	loss_p=loss_c/loss_p
 		vis.line(
-			X=torch.ones(1).cpu() *training_sample,
+			X=torch.ones(1).cpu() * batch_idx + torch.ones(1).cpu() * (epoch - trained-1)* args.batch_size,
 			Y=loss.item() * torch.ones(1).cpu(),
 			win=loss_window,
 			update='append')
 		vis.line(
-			X=torch.ones(1).cpu() * training_sample,
+			X=torch.ones(1).cpu() * batch_idx + torch.ones(1).cpu() * (epoch - trained-1)* args.batch_size,
 			Y=loss_c.item() * torch.ones(1).cpu(),
 			win=lossc_window,
 			update='append')
 		vis.line(
-			X=torch.ones(1).cpu() * training_sample,
+			X=torch.ones(1).cpu() * batch_idx + torch.ones(1).cpu() * (epoch - trained-1)* args.batch_size,
 			Y=loss_a.item() * torch.ones(1).cpu(),
 			win=lossa_window,
 			update='append')
 		vis.line(
-			X=torch.ones(1).cpu() * training_sample,
+			X=torch.ones(1).cpu() * batch_idx + torch.ones(1).cpu() * (epoch - trained-1)* args.batch_size,
 			Y=loss_p.item() * torch.ones(1).cpu(),
 			win=lossp_window,
 			update='append')
-		training_sample+=1
 		if batch_idx % 1 == 0:
-			print('Train Epoch: {} [{}/{} ({:.0f}% training_sample:%d)]  Loss_c: {:.4f}  Loss_f: {:.4f}  Loss_p: {:.4f}  Loss_a: {:.4f}  Loss_pr: {:.4f}'.format(
+			print('Train Epoch: {} [{}/{} ({:.0f}%)]  Loss_c: {:.4f}  Loss_f: {:.4f}  Loss_p: {:.4f}  Loss_a: {:.4f}  Loss_pr: {:.4f}'.format(
 				epoch, batch_idx * len(data), len(train_loader.dataset),
-				len(data) * batch_idx / len(train_loader)/10,training_sample,
+				len(data) * batch_idx / len(train_loader)/10,
 				loss_c.item(),loss_f.item(),loss_p.item(),loss_a.item(),loss_pr.item()))
-		if (batch_idx+1)%1000==0:
+		if batch_idx%1000==0:
 			best_filename = join(vae_dir, 'best.pkl')
 			filename_vae = join(vae_dir, 'vae_checkpoint_'+str(epoch)+'.pkl')
 			filename_pre = join(vae_dir, 'pre_checkpoint_'+str(epoch)+'.pkl')
@@ -300,7 +290,7 @@ def train(epoch,vae_dir,training_sample):
 				'optimizer': optimizer_a.state_dict(),
 
 			}, is_best, filename_control, best_filename)
-	return training_sample
+
 
 
 def test():
@@ -349,7 +339,7 @@ if not exists(vae_dir):
 	#trained=0
 	# scheduler.load_state_dict(state['scheduler'])
 	# earlystopping.load_state_dict(state['earlystopping'])
-# state = torch.load('/home/ld/gym-car/log/vae/contorl_checkpoint_8.pkl')
+# state = torch.load('/home/ld/gym-car/log/vae/contorl_checkpoint_1.pkl')
 # controller.load_state_dict(state['state_dict'])
 # optimizer_a.load_state_dict(state['optimizer'])
 # print('contorller load success')
@@ -362,13 +352,11 @@ model.load_state_dict(state['state_dict'])
 optimizer.load_state_dict(state['optimizer'])
 trained=state['epoch']
 print('vae load success')
-trained=0
 cur_best = None
 all_data=6000
 sample_data=1000
 sample_buff=all_data/sample_data
 sample_count=0
-training_sample=0
 for epoch in range(trained+1, args.epochs + 1):
 	dataset_train = RolloutObservationDataset('/data/result/',transform_train, train=True,sample_data=sample_data,sample_count=sample_count)
 	#dataset_test = RolloutObservationDataset('/data/result/',transform_test, train=False,sample_data=sample_data,sample_count=sample_count)
@@ -379,7 +367,7 @@ for epoch in range(trained+1, args.epochs + 1):
 		dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=32,drop_last=True)
 	# test_loader = torch.utils.data.DataLoader(
 	# 	dataset_test, batch_size=args.batch_size, shuffle=False, num_workers=32,drop_last=True)
-	training_sample=train(epoch,vae_dir,training_sample)
+	train(epoch,vae_dir)
 	#exit()
 	#test_loss = test()
 	# scheduler.step(test_loss)
@@ -394,24 +382,24 @@ for epoch in range(trained+1, args.epochs + 1):
 	# if is_best:
 	#	 cur_best = test_loss
 	is_best=False
-	# save_checkpoint({
-	# 	'epoch': epoch,
-	# 	'state_dict': model.state_dict(),
-	# 	'optimizer': optimizer.state_dict(),
+	save_checkpoint({
+		'epoch': epoch,
+		'state_dict': model.state_dict(),
+		'optimizer': optimizer.state_dict(),
 
-	# }, is_best, filename_vae, best_filename)
-	# save_checkpoint({
-	# 	'epoch': epoch,
-	# 	'state_dict': model_p.state_dict(),
-	# 	'optimizer': optimizer_p.state_dict(),
+	}, is_best, filename_vae, best_filename)
+	save_checkpoint({
+		'epoch': epoch,
+		'state_dict': model_p.state_dict(),
+		'optimizer': optimizer_p.state_dict(),
 
-	# }, is_best, filename_pre, best_filename)
-	# save_checkpoint({
-	# 	'epoch': epoch,
-	# 	'state_dict': controller.state_dict(),
-	# 	'optimizer': optimizer_a.state_dict(),
+	}, is_best, filename_pre, best_filename)
+	save_checkpoint({
+		'epoch': epoch,
+		'state_dict': controller.state_dict(),
+		'optimizer': optimizer_a.state_dict(),
 
-	# }, is_best, filename_control, best_filename)
+	}, is_best, filename_control, best_filename)
 
 
 	if not args.nosamples:
