@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-27 01:06:36
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-08-02 22:09:30
+# @Last Modified time: 2019-08-02 22:10:07
 
 """ Training perception and control """
 import argparse
@@ -81,7 +81,7 @@ optimizer_a = optim.SGD(controller.parameters(),lr=learning_rate*10)
 # scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
 # earlystopping = EarlyStopping('min', patience=30)
 
-vis = visdom.Visdom(env='pa_train')
+vis = visdom.Visdom(env='corner_train')
 
 current_window = vis.image(
 	np.random.rand(64, 64),
