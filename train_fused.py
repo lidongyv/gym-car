@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-27 01:06:36
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-08-03 18:40:24
+# @Last Modified time: 2019-08-03 19:44:44
 
 """ Training perception and control """
 import argparse
@@ -70,10 +70,10 @@ model=VAE(3, LSIZE)
 model=torch.nn.DataParallel(model,device_ids=range(8))
 model.cuda()
 optimizer = optim.Adam(model.parameters(),lr=learning_rate,betas=(0.9,0.999))
-model_p=VAE_a(7, LSIZE)
-model_p=torch.nn.DataParallel(model_p,device_ids=range(8))
-model_p.cuda()
-optimizer_p = optim.Adam(model_p.parameters(),lr=learning_rate,betas=(0.9,0.999))
+# model_p=VAE_a(7, LSIZE)
+# model_p=torch.nn.DataParallel(model_p,device_ids=range(8))
+# model_p.cuda()
+# optimizer_p = optim.Adam(model_p.parameters(),lr=learning_rate,betas=(0.9,0.999))
 controller=Controller(LSIZE,3)
 controller=torch.nn.DataParallel(controller,device_ids=range(8))
 controller=controller.cuda()
@@ -95,14 +95,14 @@ mask_window = vis.image(
 	np.random.rand(64, 64),
 	opts=dict(title='mask!', caption='mask.'),
 )
-future_window = vis.image(
-	np.random.rand(64, 64),
-	opts=dict(title='future!', caption='future.'),
-)
-pre_window = vis.image(
-	np.random.rand(64, 64),
-	opts=dict(title='prediction!', caption='prediction.'),
-)
+# future_window = vis.image(
+# 	np.random.rand(64, 64),
+# 	opts=dict(title='future!', caption='future.'),
+# )
+# pre_window = vis.image(
+# 	np.random.rand(64, 64),
+# 	opts=dict(title='prediction!', caption='prediction.'),
+# )
 loss_window = vis.line(X=torch.zeros((1,)).cpu(),
 					   Y=torch.zeros((1)).cpu(),
 					   opts=dict(xlabel='minibatches',
@@ -121,12 +121,12 @@ lossa_window = vis.line(X=torch.zeros((1,)).cpu(),
 								 ylabel='Loss',
 								 title='controller Loss',
 								 legend=['controller Loss']))
-lossp_window = vis.line(X=torch.zeros((1,)).cpu(),
-					   Y=torch.zeros((1)).cpu(),
-					   opts=dict(xlabel='minibatches',
-								 ylabel='Loss',
-								 title='prediction Loss',
-								 legend=['prediction Loss']))
+# lossp_window = vis.line(X=torch.zeros((1,)).cpu(),
+# 					   Y=torch.zeros((1)).cpu(),
+# 					   opts=dict(xlabel='minibatches',
+# 								 ylabel='Loss',
+# 								 title='prediction Loss',
+# 								 legend=['prediction Loss']))
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, sigma):
@@ -162,7 +162,7 @@ def loss_function(recon_x, x, mu, sigma):
 def train(epoch,vae_dir,training_sample):
 	""" One training epoch """
 	model.train()
-	model_p.train()
+	# model_p.train()
 	controller.train()
 	train_loss = []
 	for batch_idx, [data,action,pre] in enumerate(train_loader):
@@ -171,14 +171,14 @@ def train(epoch,vae_dir,training_sample):
 		action=action.cuda()
 		pre=pre.cuda()
 		optimizer.zero_grad()
-		optimizer_p.zero_grad()
+		# optimizer_p.zero_grad()
 		optimizer_a.zero_grad()
 		recon_c, mu_c, var_c = model(data)
 		loss_c = loss_function(recon_c, data, mu_c, var_c)
 		recon_f, mu_f, var_f = model(pre)
 		loss_f = loss_function(recon_f, pre, mu_f, var_f)
-		recon_p, mu_p, var_p = model_p(torch.cat([data,action],dim=1))
-		loss_p = loss_function(recon_p, pre, mu_p, var_p)
+		# recon_p, mu_p, var_p = model_p(torch.cat([data,action],dim=1))
+		# loss_p = loss_function(recon_p, pre, mu_p, var_p)
 		mu, sigma = mu_c.detach().cuda(), var_c.detach().cuda()
 		#sigma = torch.exp(sigma/2.0)
 		epsilon = torch.randn_like(sigma)
@@ -188,12 +188,12 @@ def train(epoch,vae_dir,training_sample):
 		#print(action[:,:,0,0])
 		loss_a=F.mse_loss(action_p,action[:,:3,11,11],reduction='mean')
 		#action_pr=torch.cat([action_p.detach().view(action_p.shape[0],3,1,1).expand(action_p.shape[0],3,action.shape[-2],action.shape[-1]),action[:,2:3,...]])
-		action_pr=action_p.detach().view(action_p.shape[0],3,1,1).expand(action_p.shape[0],3,action.shape[-1],action.shape[-2])
-		action_pr=torch.cat([action_pr,action[:,2:3,:,:]],dim=1)
-		recon_pr, mu_pr, var_pr = model_p(torch.cat([data,action_pr],dim=1))
-		loss_pr = loss_function(recon_pr, pre, mu_pr, var_pr)
+		# action_pr=action_p.detach().view(action_p.shape[0],3,1,1).expand(action_p.shape[0],3,action.shape[-1],action.shape[-2])
+		# action_pr=torch.cat([action_pr,action[:,2:3,:,:]],dim=1)
+		# recon_pr, mu_pr, var_pr = model_p(torch.cat([data,action_pr],dim=1))
+		# loss_pr = loss_function(recon_pr, pre, mu_pr, var_pr)
 
-		loss=loss_c+loss_f+loss_p+loss_a+loss_pr
+		loss=loss_c+loss_f+loss_a
 		if torch.isnan(loss) or torch.isinf(loss):
 			print('nan or inf error:',loss.item() )
 			continue
@@ -202,7 +202,6 @@ def train(epoch,vae_dir,training_sample):
 		#print(loss.item())
 		train_loss.append(loss.item())
 		optimizer.step()
-		optimizer_p.step()
 		optimizer_a.step()
 		ground = data[0,...].data.cpu().numpy().astype('float32')
 		ground = np.reshape(ground, [3,64, 64])
@@ -225,20 +224,20 @@ def train(epoch,vae_dir,training_sample):
 			opts=dict(title='Reconstruction!', caption='Reconstruction.'),
 			win=mask_window,
 		)
-		ground = pre[0,...].data.cpu().numpy().astype('float32')
-		ground = np.reshape(ground, [3,64, 64])
-		vis.image(
-			ground,
-			opts=dict(title='future!', caption='ground.'),
-			win=future_window,
-		)
-		image = recon_p[0,...].data.cpu().numpy().astype('float32')
-		image = np.reshape(image, [3, 64, 64])
-		vis.image(
-			image,
-			opts=dict(title='prediction!', caption='prediction.'),
-			win=pre_window,
-		)
+		# ground = pre[0,...].data.cpu().numpy().astype('float32')
+		# ground = np.reshape(ground, [3,64, 64])
+		# vis.image(
+		# 	ground,
+		# 	opts=dict(title='future!', caption='ground.'),
+		# 	win=future_window,
+		# )
+		# image = recon_p[0,...].data.cpu().numpy().astype('float32')
+		# image = np.reshape(image, [3, 64, 64])
+		# vis.image(
+		# 	image,
+		# 	opts=dict(title='prediction!', caption='prediction.'),
+		# 	win=pre_window,
+		# )
 		# if loss.item()>5:
 		# 	loss=loss/loss
 		# if loss_c>5:
@@ -262,17 +261,13 @@ def train(epoch,vae_dir,training_sample):
 			Y=loss_a.item() * torch.ones(1).cpu(),
 			win=lossa_window,
 			update='append')
-		vis.line(
-			X=torch.ones(1).cpu() * training_sample,
-			Y=loss_p.item() * torch.ones(1).cpu(),
-			win=lossp_window,
-			update='append')
+
 		training_sample+=1
 		if batch_idx % 1 == 0:
-			print('Train Epoch: {} [{}/{} ({:.0f}% training_sample:{:.0f}]  Loss_c: {:.4f}  Loss_f: {:.4f}  Loss_p: {:.4f}  Loss_a: {:.4f}  Loss_pr: {:.4f}'.format(
+			print('Train Epoch: {} [{}/{} ({:.0f}% training_sample:{:.0f}]  Loss_c: {:.4f}  Loss_f: {:.4f}   Loss_a: {:.4f} '.format(
 				epoch, batch_idx * len(data), len(train_loader.dataset),
 				len(data) * batch_idx / len(train_loader)/10,training_sample,
-				loss_c.item(),loss_f.item(),loss_p.item(),loss_a.item(),loss_pr.item()))
+				loss_c.item(),loss_f.item(),loss_a.item()))
 		# if (batch_idx+1)%1000==0:
 		# 	best_filename = join(vae_dir, 'best.pkl')
 		# 	filename_vae = join(vae_dir, 'vae_checkpoint_'+str(epoch)+'.pkl')
@@ -353,10 +348,10 @@ state = torch.load('/home/ld/gym-car/log/vae/contorl_checkpoint_52.pkl')
 controller.load_state_dict(state['state_dict'])
 optimizer_a.load_state_dict(state['optimizer'])
 print('contorller load success')
-state = torch.load('/home/ld/gym-car/log/vae/pre_checkpoint_52.pkl')
-model_p.load_state_dict(state['state_dict'])
-optimizer_p.load_state_dict(state['optimizer'])
-print('prediction load success')
+# state = torch.load('/home/ld/gym-car/log/vae/pre_checkpoint_52.pkl')
+# model_p.load_state_dict(state['state_dict'])
+# optimizer_p.load_state_dict(state['optimizer'])
+# print('prediction load success')
 state = torch.load('/home/ld/gym-car/log/vae/vae_checkpoint_52.pkl')
 model.load_state_dict(state['state_dict'])
 optimizer.load_state_dict(state['optimizer'])
@@ -401,12 +396,12 @@ for epoch in range(trained+1, args.epochs + 1):
 		'optimizer': optimizer.state_dict(),
 
 	}, is_best, filename_vae, best_filename)
-	save_checkpoint({
-		'epoch': epoch,
-		'state_dict': model_p.state_dict(),
-		'optimizer': optimizer_p.state_dict(),
+	# save_checkpoint({
+	# 	'epoch': epoch,
+	# 	'state_dict': model_p.state_dict(),
+	# 	'optimizer': optimizer_p.state_dict(),
 
-	}, is_best, filename_pre, best_filename)
+	# }, is_best, filename_pre, best_filename)
 	save_checkpoint({
 		'epoch': epoch,
 		'state_dict': controller.state_dict(),
