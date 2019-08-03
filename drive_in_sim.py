@@ -73,10 +73,10 @@ if __name__=="__main__":
   controller=Controller(64,3)
   controller=torch.nn.DataParallel(controller,device_ids=range(1))
   controller=controller.cuda()
-  state = torch.load('/home/ld/gym-car/log/vae/contorl_checkpoint_52.pkl')
+  state = torch.load('/home/ld/gym-car/log/vae/contorl_checkpoint_30.pkl')
   controller.load_state_dict(state['state_dict'])
   print('contorller load success')
-  state = torch.load('/home/ld/gym-car/log/vae/vae_checkpoint_52.pkl')
+  state = torch.load('/home/ld/gym-car/log/vae/vae_checkpoint_30.pkl')
   model.load_state_dict(state['state_dict'])
   print('vae load success')
   # from pyglet.window import key

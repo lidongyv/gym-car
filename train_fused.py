@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-27 01:06:36
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-08-03 00:33:04
+# @Last Modified time: 2019-08-03 18:40:24
 
 """ Training perception and control """
 import argparse
@@ -25,7 +25,7 @@ from utils.misc import LSIZE, RED_SIZE
 ## WARNING : THIS SHOULD BE REPLACE WITH PYTORCH 0.5
 from utils.learning import EarlyStopping
 from utils.learning import ReduceLROnPlateau
-from data.loaders import RolloutObservationDataset
+from data.loaders_fuse import RolloutObservationDataset
 
 parser = argparse.ArgumentParser(description='VAE Trainer')
 parser.add_argument('--batch-size', type=int, default=64*8, metavar='N',
@@ -81,7 +81,7 @@ optimizer_a = optim.SGD(controller.parameters(),lr=learning_rate*10)
 # scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
 # earlystopping = EarlyStopping('min', patience=30)
 
-vis = visdom.Visdom(env='corner_train')
+vis = visdom.Visdom(env='fuse_train')
 
 current_window = vis.image(
 	np.random.rand(64, 64),
@@ -331,7 +331,7 @@ def test():
 	return test_loss
 
 # check vae dir exists, if not, create it
-vae_dir = join(args.logdir, 'vae_corner')
+vae_dir = join(args.logdir, 'vae_fuse')
 if not exists(vae_dir):
 	mkdir(vae_dir)
 	mkdir(join(vae_dir, 'samples'))
@@ -365,12 +365,12 @@ print('vae load success')
 trained=0
 cur_best = None
 all_data=6000
-sample_data=6000
+sample_data=3000
 sample_buff=all_data/sample_data
 sample_count=0
 training_sample=0
 for epoch in range(trained+1, args.epochs + 1):
-	dataset_train = RolloutObservationDataset('/data/corner/',transform_train, train=True,sample_data=sample_data,sample_count=sample_count)
+	dataset_train = RolloutObservationDataset(root='/data/corner/',root2='/data/result/',transform=transform_train, train=True,sample_data=sample_data,sample_count=sample_count)
 	#dataset_test = RolloutObservationDataset('/data/result/',transform_test, train=False,sample_data=sample_data,sample_count=sample_count)
 	sample_count+=1
 	if sample_count==sample_buff:
