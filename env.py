@@ -68,6 +68,7 @@ if __name__=="__main__":
     restart = False
     while True:
       s, r, done, info = env.step(a)
+      print(info)
       total_reward += r
       if steps % 1 == 0 or done:
         print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
