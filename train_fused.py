@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2019-07-27 01:06:36
 # @Last Modified by:   yulidong
-# @Last Modified time: 2019-08-03 19:44:44
+# @Last Modified time: 2019-08-04 22:34:24
 
 """ Training perception and control """
 import argparse
@@ -360,7 +360,7 @@ print('vae load success')
 trained=0
 cur_best = None
 all_data=6000
-sample_data=3000
+sample_data=1000
 sample_buff=all_data/sample_data
 sample_count=0
 training_sample=0

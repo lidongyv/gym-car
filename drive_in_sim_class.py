@@ -16,7 +16,7 @@ from torchvision.utils import save_image
 import numpy as np
 from models.vae import VAE
 from models.action_vae import VAE_a
-from models.controller import Controller
+from models.controller_class import Controller_class
 import visdom
 from utils.misc import save_checkpoint
 from utils.misc import LSIZE, RED_SIZE
@@ -70,13 +70,13 @@ if __name__=="__main__":
   model=VAE(3, 64)
   model=torch.nn.DataParallel(model,device_ids=range(1))
   model.cuda()
-  controller=Controller(64,3)
+  controller=Controller_class(64,3)
   controller=torch.nn.DataParallel(controller,device_ids=range(1))
   controller=controller.cuda()
-  state = torch.load('/home/ld/gym-car/log/vae_fuse/contorl_checkpoint_10.pkl')
+  state = torch.load('/home/ld/gym-car/log/class/contorl_checkpoint_10.pkl')
   controller.load_state_dict(state['state_dict'])
   print('contorller load success')
-  state = torch.load('/home/ld/gym-car/log/vae_fuse/vae_checkpoint_10.pkl')
+  state = torch.load('/home/ld/gym-car/log/class/vae_checkpoint_10.pkl')
   model.load_state_dict(state['state_dict'])
   print('vae load success')
   # from pyglet.window import key
@@ -105,7 +105,6 @@ if __name__=="__main__":
     angle=[]
     while True:
       obs, reward, done, info = env.step(action)
-      action_p=action
       total_reward += reward
       obs=transform(obs).view(1,3,64,64)
       recon_c, mu_c, var_c = model(obs)
@@ -114,10 +113,15 @@ if __name__=="__main__":
       epsilon = torch.randn_like(sigma)
       z=mu+sigma*epsilon
       z=z.cuda().view(obs.shape[0],-1).detach()
-      action=controller(z)
-      action=action.view(-1).data.cpu().numpy().astype('float32')
+      action_p=controller(z)
+      # action=action.view(-1).data.cpu().numpy().astype('float32')
+      #print(action_p)
+      action[0]=np.argmax(np.reshape(action_p[0].data.cpu().numpy().astype('float32'),-1))-1
+      action[1]=np.argmax(np.reshape(action_p[1].data.cpu().numpy().astype('float32'),-1))
+      action[2]=np.argmax(np.reshape(action_p[2].data.cpu().numpy().astype('float32'),-1))
       action=np.array(action)
       print(info)
+      print(action)
       
       # angle.append(action[0])
       if info['speed']>50:
@@ -138,7 +142,7 @@ if __name__=="__main__":
 
       #         # elif info['speed']>40:
       #         #   action[1]=0
-      #         #   action[2]=0.5
+      #         #   actieon[2]=0.5
       #     else: 
       #         action[0]=0
       #         action[1]=1
@@ -150,8 +154,8 @@ if __name__=="__main__":
 
 
 
-      if action[0]>0.5:
-          action[0]=1
+      if action[0]==1:
+
           if info['speed']>40:
               action[1]=0
               action[2]=0.5
@@ -161,8 +165,8 @@ if __name__=="__main__":
           else:
               action[1]=0.1
               action[2]=0
-      elif action[0]<-0.5:
-          action[0]=-1
+      elif action[0]==-1:
+
           if info['speed']>40:
               action[1]=0
               action[2]=0.5
@@ -180,6 +184,7 @@ if __name__=="__main__":
           elif info['speed']<50:
               action[1]=1
               action[2]=0
+
           # else:
           #     action[1]=0.1
           #     action[2]=0
